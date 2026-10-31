@@ -565,7 +565,7 @@ function InfoPanel({ product: p, mobile, getRect }: { product: Product; mobile: 
     <motion.div
       initial="hidden" animate="show" exit={{ opacity: 0, transition: { duration: 0.2 } }}
       variants={{ hidden: {}, show: { transition: { delayChildren: 0.95, staggerChildren: 0.09 } } }}
-      className={cn("absolute z-30", mobile ? "inset-x-0 bottom-0 bg-gradient-to-t from-black via-black/90 to-transparent px-5 pb-5 pt-14" : "left-[5vw] top-1/2 w-[min(24vw,320px)] -translate-y-1/2")}
+      className={cn("absolute z-30", mobile ? "inset-x-0 bottom-0 bg-linear-to-t from-black via-black/90 to-transparent px-5 pb-5 pt-14" : "left-[5vw] top-1/2 w-[min(24vw,320px)] -translate-y-1/2")}
     >
       <motion.p variants={item} className="text-[8px] uppercase tracking-[0.35em] text-[#f5efe6]/55 md:text-[9px]">N°{String(products.findIndex((x) => x.slug === p.slug) + 1).padStart(2, "0")} · {genderLabel[p.gender]}</motion.p>
       <h2 className="font-display mt-1.5 overflow-hidden pb-1 text-[34px] font-light leading-[1.05] md:text-[48px]">
