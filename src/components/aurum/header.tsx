@@ -13,6 +13,7 @@ const MotionLink = motion.create(Link);
 const links = [
   { href: "/", label: "Главная" },
   { href: "/collection", label: "Коллекция" },
+  { href: "/showcase", label: "Шоу-рум" },
   // { href: "/#contact", label: "Контакты" },
 ];
 
