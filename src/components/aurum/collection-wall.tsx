@@ -63,6 +63,89 @@ function getGeo(W: number, H: number, n: number): Geo {
   return { mobile, ow, oh, ox, oy, gap: W * 0.18, closed };
 }
 
+/* ------------------------------------------------------------------ */
+/* Realistic polished-marble floor: veins, perspective tile seams,    */
+/* wall reflection, contact shadow and light pools under each niche.  */
+/* ------------------------------------------------------------------ */
+const svgUri = (svg: string) => `url("data:image/svg+xml,${encodeURIComponent(svg)}")`;
+const veinTable = (peak: number) => Array.from({ length: 41 }, (_, i) => (i === 20 ? peak : i === 19 || i === 21 ? peak * 0.3 : 0)).join(" ");
+const marbleSvg = (seed: number, fx: string, peak: number) =>
+  `<svg xmlns='http://www.w3.org/2000/svg' width='1400' height='800'><filter id='f' x='0' y='0' width='100%' height='100%' color-interpolation-filters='sRGB'><feTurbulence type='fractalNoise' baseFrequency='${fx}' numOctaves='5' seed='${seed}' stitchTiles='stitch'/><feColorMatrix values='0 0 0 0 1 0 0 0 0 1 0 0 0 0 1 1 0 0 0 0'/><feComponentTransfer><feFuncA type='table' tableValues='${veinTable(peak)}'/></feComponentTransfer></filter><rect width='100%' height='100%' filter='url(#f)'/></svg>`;
+const grainSvg = `<svg xmlns='http://www.w3.org/2000/svg' width='400' height='400'><filter id='g' x='0' y='0' width='100%' height='100%'><feTurbulence type='fractalNoise' baseFrequency='.9' numOctaves='2' seed='3' stitchTiles='stitch'/><feColorMatrix values='0 0 0 0 1 0 0 0 0 1 0 0 0 0 1 0 0 0 .5 0'/></filter><rect width='100%' height='100%' filter='url(#g)'/></svg>`;
+const VEINS_A = svgUri(marbleSvg(7, ".0022 .0085", 0.75));
+const VEINS_B = svgUri(marbleSvg(31, ".006 .02", 0.45));
+const GRAIN = svgUri(grainSvg);
+
+function Floor({ world, geo }: { world: { W: number; H: number; minX: number; maxX: number; maxY: number; floorTop: number }; geo: Geo }) {
+  const w = world.maxX - world.minX;
+  const h = world.maxY - world.floorTop;
+  const cx = world.W / 2 - world.minX;
+
+  // perspective tile seams: a vanishing point above the floor, depth spacing shrinks toward the wall
+  const seams = useMemo(() => {
+    const V = world.H * 0.38;                 // horizon height above the wall/floor line
+    const zf = 1, step = 0.085;
+    const horiz: number[] = [];
+    for (let z = zf; z > 0.14; z -= step) horiz.push(V * zf / z - V);
+    const tileW = Math.max(150, world.W * 0.17);
+    const verts: number[] = [];
+    const n = Math.ceil(w / tileW) + 8;
+    for (let k = -n; k <= n; k++) verts.push(cx + k * tileW * (1 + h / V) * 0.62);
+    return { V, horiz, verts };
+  }, [world.H, world.W, w, h, cx]);
+
+  const h0 = h;
+  return (
+    <div aria-hidden className="absolute overflow-hidden" style={{
+      left: world.minX, width: w, top: world.floorTop, height: h,
+      background: `linear-gradient(to bottom, #1d1d22 0px, #101014 ${h0 * 0.12}px, #08080b ${h0 * 0.4}px, #030304 ${h0}px)`,
+    }}>
+      {/* marble veins (fade with distance: crisper near the viewer) */}
+      <div className="absolute inset-0 mix-blend-screen opacity-[.16]" style={{
+        backgroundImage: VEINS_A, backgroundSize: "1400px 800px",
+        maskImage: "linear-gradient(to bottom, rgba(0,0,0,.25), black 55%)", WebkitMaskImage: "linear-gradient(to bottom, rgba(0,0,0,.25), black 55%)",
+      }} />
+      <div className="absolute inset-0 mix-blend-screen opacity-[.09]" style={{ backgroundImage: VEINS_B, backgroundSize: "900px 520px", backgroundPosition: "180px 90px" }} />
+      {/* polished-stone micro grain */}
+      <div className="absolute inset-0 mix-blend-overlay opacity-[.10]" style={{ backgroundImage: GRAIN, backgroundSize: "400px 400px" }} />
+
+      {/* tile seams in perspective (dark groove + thin light edge) */}
+      <svg className="absolute inset-0" width={w} height={h} viewBox={`0 0 ${w} ${h}`} preserveAspectRatio="none">
+        <g stroke="rgba(0,0,0,.65)" strokeWidth="2.2" fill="none">
+          {seams.horiz.map((y, i) => <line key={`h${i}`} x1="0" x2={w} y1={y} y2={y} />)}
+          {seams.verts.map((bx, i) => <line key={`v${i}`} x1={cx} y1={-seams.V} x2={cx + (bx - cx) * (1 + h / seams.V)} y2={h} />)}
+        </g>
+        <g stroke="rgba(255,255,255,.07)" strokeWidth="1" fill="none">
+          {seams.horiz.map((y, i) => <line key={`hl${i}`} x1="0" x2={w} y1={y + 2} y2={y + 2} />)}
+          {seams.verts.map((bx, i) => <line key={`vl${i}`} x1={cx + 2} y1={-seams.V} x2={cx + (bx - cx) * (1 + h / seams.V) + 2} y2={h} />)}
+        </g>
+      </svg>
+
+      {/* soft pools of lamp light on the polished stone, under every niche */}
+      {geo.closed.map((c, i) => {
+        const pw = c.w * 1.9, ph = Math.max(60, c.h * 0.42);
+        return (
+          <div key={i} className="absolute mix-blend-screen" style={{
+            left: c.x + c.w / 2 - world.minX - pw / 2, top: -ph * 0.12, width: pw, height: ph,
+            background: "radial-gradient(ellipse at 50% 22%, rgba(255,226,180,.20), rgba(255,226,180,.07) 42%, transparent 70%)",
+          }} />
+        );
+      })}
+
+      {/* broad glossy sheen, strongest on the vertical axis of the room */}
+      <div className="absolute inset-0 mix-blend-screen" style={{ background: `radial-gradient(ellipse ${0.75 * world.W}px ${0.6 * h0}px at ${cx}px 0px, rgba(255,255,255,.11), transparent 70%)` }} />
+      <div className="absolute inset-0 mix-blend-soft-light" style={{ background: "linear-gradient(115deg, transparent 30%, rgba(255,255,255,.16) 46%, transparent 58%)" }} />
+
+      {/* wall / floor junction: bright skirting reflection, then a contact shadow */}
+      <div className="absolute inset-x-0 top-0 h-px bg-white/35" />
+      <div className="absolute inset-x-0 top-px h-14 bg-linear-to-b from-white/[.10] via-white/[.03] to-transparent" />
+      <div className="absolute inset-x-0 top-0 h-3 bg-linear-to-b from-black/60 to-transparent" />
+      {/* near edge falls into darkness */}
+      <div className="absolute inset-x-0 bottom-0 h-1/3 bg-linear-to-t from-black/70 to-transparent" />
+    </div>
+  );
+}
+
 export function CollectionWall() {
   const [active, setActive] = useState<string | null>(null);
   const [hovered, setHovered] = useState<string | null>(null);
@@ -171,20 +254,8 @@ export function CollectionWall() {
             }} />
         ))}
 
-        {/* qora yaltiroq pol: endi doim ko'rinadi va ekran oxirigacha cho'ziladi */}
-        {world && (() => {
-          const h0 = world.H - world.floorTop;
-          return (
-            <div aria-hidden className="absolute" style={{
-              left: world.minX, width: world.maxX - world.minX, top: world.floorTop, height: world.maxY - world.floorTop,
-              background: `linear-gradient(to bottom, #15151a 0px, #08080b ${h0 * 0.28}px, #020203 ${h0}px, #020203 100%)`,
-            }}>
-              <div className="absolute inset-x-0 top-0 h-px bg-white/25" />
-              <div className="absolute inset-x-0 top-0 h-10 bg-linear-to-b from-white/[.07] to-transparent" />
-              <div className="absolute inset-0" style={{ background: `radial-gradient(ellipse ${0.7 * world.W}px ${0.55 * h0}px at ${world.W / 2 - world.minX}px 0px, rgba(255,255,255,.10), transparent 70%)` }} />
-            </div>
-          );
-        })()}
+        {/* realistik sayqallangan marmar pol */}
+        {world && geo && <Floor world={world} geo={geo} />}
         {geo && (
           <>
             {products.map((p, i) => (
@@ -217,7 +288,7 @@ export function CollectionWall() {
       </motion.div>
       <div aria-hidden className="pointer-events-none absolute inset-0 bg-[radial-gradient(ellipse_at_center,transparent_30%,#000_105%)]" />
       {/* when a niche opens the left side goes black (room for the text) */}
-      <motion.div aria-hidden className={cn("pointer-events-none absolute inset-0", mobile ? "bg-linear-to-b from-black/40 to-black/80" : "bg-linear-to-r from-black via-black/85 to-transparent mask-[linear-gradient(to_right,black_30%,transparent_62%)]")}
+      <motion.div aria-hidden className={cn("pointer-events-none absolute inset-0", mobile ? "bg-linear-to-b from-transparent via-transparent to-black/35" : "bg-linear-to-r from-black via-black/85 to-transparent mask-[linear-gradient(to_right,black_30%,transparent_62%)]")}
         animate={{ opacity: expanded ? 1 : 0 }} transition={{ duration: 0.9, delay: expanded ? 0.3 : 0 }} />
       {/* bottom-left title (wall view): small and quiet, like a boutique */}
       <motion.div
@@ -229,7 +300,7 @@ export function CollectionWall() {
           <h1 className="font-display mt-1.5 text-[26px] font-light leading-none md:text-[38px]">Ночная <span className="italic text-[#c9a96e]">коллекция</span></h1>
           <p className="mt-1.5 text-[9px] text-[#f5efe6]/45 md:text-[10px]">Тонкие ароматы, малыми партиями.</p>
         </div>
-        <p className="hidden text-right text-[9px] uppercase tracking-[0.3em] text-[#f5efe6]/45 md:block">Нажмите на нишу, чтобы подойти ближе</p>
+        {/* <p className="hidden text-right text-[9px] uppercase tracking-[0.3em] text-[#f5efe6]/45 md:block">Нажмите на нишу, чтобы подойти ближе</p> */}
       </motion.div>
 
       {/* product view */}
@@ -288,7 +359,8 @@ function Niche({ p, i, geo, active, hovered, selected, intro, setBottle, onOpen,
   const floorTop = Math.max(...geo.closed.map((x) => x.y + x.h)) + (geo.mobile ? 34 : 16);
   const bottom = c.y + c.h;
   const onFloor = bottom >= floorTop - (geo.mobile ? 34 : 16) - 1;
-  const reflectGap = floorTop - bottom;
+  const reflectDrop = geo.mobile ? 14 : 22; // soya nisha tagidan shuncha pastroqdan boshlanadi
+  const reflectGap = floorTop - bottom + reflectDrop;
 
   const delay = intro ? 0.15 + i * 0.12 : 0;
   // wall brightness: hovered one lights up, the rest sink into the dark
@@ -374,15 +446,29 @@ function Niche({ p, i, geo, active, hovered, selected, intro, setBottle, onOpen,
 
       {/* floor reflection (niche + bottle, mirrored) */}
       <motion.div aria-hidden className="pointer-events-none absolute inset-x-0 h-[40%] overflow-hidden blur-[1.5px]"
-        style={{ top: `calc(100% + ${reflectGap}px)`, maskImage: "linear-gradient(to bottom, rgba(0,0,0,.4), transparent 85%)", WebkitMaskImage: "linear-gradient(to bottom, rgba(0,0,0,.4), transparent 85%)" }}
+        style={{ top: `calc(100% + ${reflectGap}px)`, maskImage: "linear-gradient(to bottom, rgba(0,0,0,.55), transparent 85%)", WebkitMaskImage: "linear-gradient(to bottom, rgba(0,0,0,.55), transparent 85%)" }}
         animate={{ opacity: !onFloor ? 0 : expanded ? (isActive ? 1 : 0.3) : hovered && !hov ? 0.4 : 1 }} transition={{ duration: 0.5 }}>
         <div className="absolute inset-x-0 top-0 h-[250%]" style={{ transform: "scaleY(-1)" }}>
-          {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img src={`/collection/niche.jpg`} alt="" draggable={false} className="absolute inset-0 size-full object-cover brightness-75" />
+          {/* niche image + hover light, mirrored: the reflection lights up together with the niche */}
+          <motion.div className="absolute inset-0 overflow-hidden"
+            initial={{ filter: "brightness(0.09)" }}
+            animate={{ filter: `brightness(${wallB * 0.75})` }}
+            transition={intro ? { duration: 0.6, delay: 0.5 + i * 0.12 } : lightT}>
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img src={`/collection/niche.jpg`} alt="" draggable={false} className="absolute inset-0 size-full object-cover" />
+            <motion.div aria-hidden className="absolute bottom-[8%] left-1/2 h-[62%] w-[95%] -translate-x-1/2 mix-blend-screen"
+              style={{ background: `radial-gradient(ellipse at 50% 60%, ${p.accent}, transparent 68%)` }}
+              animate={{ opacity: lit ? 0.45 : 0 }} transition={lightT} />
+            <motion.div aria-hidden className="absolute inset-0 mix-blend-screen bg-[radial-gradient(ellipse_at_50%_12%,rgba(255,236,205,.6),transparent_58%)]"
+              animate={{ opacity: lit ? 1 : 0 }} transition={lightT} />
+            <motion.div aria-hidden className="absolute inset-x-[4%] top-[8%] h-[80%] mix-blend-screen blur-[6px]"
+              style={{ background: "linear-gradient(to bottom, rgba(255,240,215,.5), rgba(255,240,215,0) 92%)", clipPath: "polygon(41% 0, 59% 0, 100% 100%, 0 100%)" }}
+              animate={{ opacity: lit ? 1 : 0 }} transition={lightT} />
+          </motion.div>
           <motion.div
             className="absolute bottom-[8%] left-[10%] h-[56%] w-[80%]"
             style={{ y: bottleY }}
-            animate={{ opacity: hov ? 0.9 : 1, scaleX: hov ? 0.92 : 1 }}
+            animate={{ opacity: hov ? 0.9 : 1, scaleX: hov ? 0.92 : 1, filter: `brightness(${bottleB})` }}
             transition={{ duration: 0.6, ease: OUT }}
           >
             <Image

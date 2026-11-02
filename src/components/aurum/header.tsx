@@ -13,7 +13,7 @@ const MotionLink = motion.create(Link);
 const links = [
   { href: "/", label: "Главная" },
   { href: "/collection", label: "Коллекция" },
-  { href: "/#contact", label: "Контакты" },
+  // { href: "/#contact", label: "Контакты" },
 ];
 
 export function Header() {
@@ -38,7 +38,7 @@ export function Header() {
 
   return (
     <>
-      <header className={cn("fixed inset-x-0 top-0 z-50 transition-all duration-500", scrolled ? "bg-[#0a0908]/70 py-3 backdrop-blur-xl border-b border-[#c9a96e]/15" : "py-6")}>
+      <header className={cn("fixed inset-x-0 top-0 z-50 transition-all duration-500", scrolled ? "bg-[#0a0908]/70 py-1 backdrop-blur-xl border-b border-[#c9a96e]/15" : "py-3")}>
         <div className="mx-auto flex max-w-7xl items-center justify-between px-5 md:px-8">
           <Link href="/" className="font-display text-2xl tracking-[0.35em] text-[#f5efe6]">AURUM</Link>
           <nav className="hidden items-center gap-9 text-sm tracking-wide text-[#f5efe6]/75 md:flex">

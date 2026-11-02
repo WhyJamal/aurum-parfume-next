@@ -63,9 +63,7 @@ export function ScrollStory() {
           <motion.p initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ delay: 1.5 }} className="mt-6 max-w-md text-base leading-relaxed text-[#f5efe6]/70 md:text-lg">
             Листайте вниз и посмотрите, как раскрывается аромат: от первой искры до долгого шлейфа.
           </motion.p>
-          <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ delay: 2 }} className="mt-8 flex items-center gap-3 text-[11px] uppercase tracking-[0.4em] text-[#c9a96e]">
-            <span className="h-10 w-px animate-pulse bg-gradient-to-b from-[#c9a96e] to-transparent" /> Листайте вниз
-          </motion.div>
+          
         </motion.div>
 
         {beats.map((b, i) => <Beat key={b.label} beat={b} index={i} progress={scrollYProgress} />)}
